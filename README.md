@@ -96,14 +96,13 @@
 
 Note : Used latest version of expo and react native to use new architecture of bridgeless mode as you can find in app.json and so that i can run the code on my own ios device
 
-
 * TypeScript
 * Expo Router
 * Zustand State Management
 
 # Why Zustand for State Management
 
-## Implementation Simplicity
+### Implementation Simplicity
 
 ```typescript
 export const usePlanStore = create<PlanStore>((set) => ({
@@ -116,19 +115,19 @@ export const usePlanStore = create<PlanStore>((set) => ({
 }));
 ```
 
-## Direct Component Usage
+### Direct Component Usage
 
 ```typescript
 const { plans, fetchPlans } = usePlanStore();
 ```
 
-## TypeScript Excellence
+### TypeScript Excellence
 
 * Built-in type inference
 * No extra type packages needed
 * Perfect fit with our existing TypeScript setup
 
-## Mobile-First Benefits
+### Mobile-First Benefits
 
 * Lightweight bundle size
 * Efficient re-rendering

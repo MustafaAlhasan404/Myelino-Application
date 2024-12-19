@@ -67,16 +67,16 @@ myelino/
 │   ├── screens/
 │   │   ├── planner.tsx      # Main dashboard
 │   │   └── quickplans.tsx   # Quick plans view
-├── components/       
+├── components/     
 │   ├── Plan.tsx            # Plan card component
 │   ├── PlannedDate.tsx     # Timeline visualization
 │   ├── CustomInput.tsx     # Input fields handler
 │   ├── Scroll.tsx          # Navigation options
 │   └── QuickPlanExpiration.tsx  # Expiration handling
-├── services/         
+├── services/       
 │   ├── planService.ts      # API client interface
 │   └── planStore.ts        # Zustand state management
-└── helpers/         
+└── helpers/       
     └── errorHandler.ts     # Error handling utilities
 ```
 
@@ -252,7 +252,7 @@ const PlanCard = ({ title, events, image, onPress }: PlanCardProps) => (
 * Optimized for modern iOS aspect ratios and screen sizes
 * Fully compatible with Expo Go for development
 
-## 2. Plan Management (Plan.tsx)
+## 2. Plan & Event Management
 
 ### Plan Display Strategy
 
@@ -275,3 +275,6 @@ const PlanCard = ({ title, events, image, onPress }: PlanCardProps) => (
 * Confirmation dialog prevents accidental deletions
 * Consistent interaction pattern across all plan types
 * Real-time state updates after deletion
+
+## 2. Problem
+Image seem to take too long to load

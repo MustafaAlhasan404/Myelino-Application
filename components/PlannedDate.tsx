@@ -33,7 +33,7 @@ interface EventDetails {
 }
 
 const TimelineComponent = () => {
-  const { plans, refreshPlans } = usePlanStore();
+  const { plans, setPlans, refreshPlans } = usePlanStore();
 
   const handleEventDelete = (eventId: string, eventTitle: string) => {
     Alert.alert(
@@ -50,6 +50,9 @@ const TimelineComponent = () => {
           onPress: async () => {
             try {
               await planService.deleteEvent(eventId);
+              // Immediately update the local state by filtering out the deleted event
+              setPlans(plans.filter(plan => plan._id !== eventId));
+              // Then refresh from the server
               refreshPlans();
             } catch (error) {
               Alert.alert("Error", "Failed to delete event");

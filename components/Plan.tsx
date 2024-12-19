@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Image, ImageSourcePropType, Alert, ScrollView, Modal } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Image, ImageSourcePropType, Alert, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlanStore } from '@/services/planStore';
 
@@ -79,10 +79,11 @@ const PlanCard = ({ title, events, image, onPress, isPlaceholder }: {
   );
 };
 
-const AllPlansModal = ({ visible, onClose, plans }: {
+const AllPlansModal = ({ visible, onClose, plans, onDeletePlan }: {
   visible: boolean;
   onClose: () => void;
   plans: PlanType[];
+  onDeletePlan: (id: string) => void;
 }) => (
   <Modal
     animationType="fade"
@@ -105,6 +106,7 @@ const AllPlansModal = ({ visible, onClose, plans }: {
               title={plan.title}
               events={plan.events}
               image={plan.image}
+              onPress={() => onDeletePlan(plan.id)}
             />
           ))}
         </ScrollView>
@@ -120,6 +122,21 @@ export const Plan = () => {
   useEffect(() => {
     fetchPlans();
   }, []);
+
+  const handleDeletePlan = (planId: string) => {
+    Alert.alert(
+      "Delete Plan",
+      "Are you sure you want to delete this plan?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deletePlan(planId)
+        }
+      ]
+    );
+  };
 
   const getFilteredPlans = () => {
     const today = new Date();
@@ -151,21 +168,6 @@ export const Plan = () => {
       .sort((a, b) => a.expiryDays - b.expiryDays);
   };
 
-  const handleDeletePlan = (planId: string) => {
-    Alert.alert(
-      "Delete Plan",
-      "Are you sure you want to delete this plan?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deletePlan(planId)
-        }
-      ]
-    );
-  };
-
   const filteredPlans = getFilteredPlans();
   const nearestExpiryDays = filteredPlans[0]?.expiryDays || 0;
 
@@ -176,11 +178,7 @@ export const Plan = () => {
   return (
     <View style={styles.container}>
       {filteredPlans.length > 0 && <ExpirationAlert days={nearestExpiryDays} />}
-      <ScrollView 
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.plansContainer}
-      >
+      <View style={styles.plansContainer}>
         {filteredPlans.slice(0, 2).map((plan) => (
           <PlanCard 
             key={plan.id}
@@ -198,11 +196,12 @@ export const Plan = () => {
             onPress={() => setModalVisible(true)} 
           />
         )}
-      </ScrollView>
+      </View>
       <AllPlansModal
         visible={modalVisible}
         onClose={() => setModalVisible(false)}
         plans={filteredPlans}
+        onDeletePlan={handleDeletePlan}
       />
     </View>
   );

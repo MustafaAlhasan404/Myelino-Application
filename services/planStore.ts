@@ -43,6 +43,7 @@ interface PlanStore {
   isLoading: boolean;
   error: string | null;
   setUser: (user: User) => void;
+  setPlans: (plans: Plan[]) => void;
   fetchPlans: () => Promise<void>;
   deletePlan: (id: string) => Promise<void>;
   logout: () => void;
@@ -56,6 +57,7 @@ export const usePlanStore = create<PlanStore>((set) => ({
   error: null,
 
   setUser: (user: User) => set({ user }),
+  setPlans: (plans: Plan[]) => set({ plans }),
 
   fetchPlans: async () => {
     if (usePlanStore.getState().plans.length === 0) {

@@ -8,33 +8,33 @@ interface User {
   name: string;
 }
 
+interface PlaceInfo {
+  placeName: {
+    title: string;
+    address: string;
+  };
+  description: string;
+  mainTag: string;
+  subTags: string[];
+}
+
+interface Place extends PlaceInfo {
+  photos: Array<{ url: string }>;
+}
+
+interface Myelin extends PlaceInfo {
+  file: {
+    url: string;
+  };
+}
+
 interface Plan {
   _id: string;
   plan: string;
   userId: string;
   date: string;
-  place?: {
-    placeName: {
-      title: string;
-      address: string;
-    };
-    description: string;
-    mainTag: string;
-    subTags: string[];
-    photos: Array<{ url: string }>;
-  };
-  myelin?: {
-    placeName: {
-      title: string;
-      address: string;
-    };
-    description: string;
-    mainTag: string;
-    subTags: string[];
-    file: {
-      url: string;
-    };
-  };
+  place?: Place;
+  myelin?: Myelin;
 }
 
 interface PlanStore {
@@ -46,6 +46,7 @@ interface PlanStore {
   fetchPlans: () => Promise<void>;
   deletePlan: (id: string) => Promise<void>;
   logout: () => void;
+  refreshPlans: () => Promise<void>;
 }
 
 export const usePlanStore = create<PlanStore>((set) => ({
@@ -104,6 +105,22 @@ export const usePlanStore = create<PlanStore>((set) => ({
       set({ plans: userPlans, isLoading: false });
     } catch (error) {
       set({ error: errorHandler(error), isLoading: false });
+    }
+  },
+
+  refreshPlans: async () => {
+    try {
+      const response = await planService.getAll();
+      const userPlans = response.data.allplans
+        .filter((plan: Plan) => plan.userId === usePlanStore.getState().user?.id)
+        .filter((plan: Plan, index: number, self: Plan[]) =>
+          index === self.findIndex((p) => (
+            p.plan === plan.plan && p.date === plan.date
+          ))
+        );
+      set({ plans: userPlans });
+    } catch (error) {
+      set({ error: errorHandler(error) });
     }
   },
 

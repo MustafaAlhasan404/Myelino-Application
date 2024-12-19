@@ -1,108 +1,171 @@
-# Comprehensive Technical Documentation: Myelino Application
+# Myelino Application
 
-## I. Service Layer
+Modern React Native planner application with timeline visualization and expiration tracking.
 
-### A. Plan Service (planService.ts)
+## Quick Start
 
-* Clean API client interface using axios
-* Core Methods:
-  * `getAll()`: Plan retrieval
-  * `deleteEvent(eventId)`: Event removal
-  * `deletePlans(planIds[])`: Batch deletion
-  * `clearPlanner()`: Complete data wipe
-  * `loadMockData()`: Test data loading
+Run these commands:
 
-### B. Plan Store (planStore.ts)
+```typescript
+npm install
+npx expo start --clear
+```
 
-* Zustand-based state management
-* Data Models:
+## API Services
 
-  ```typescript
-  User {
-    id: string
-    email: string
-    name: string
-  }
-  Plan {
-    _id: string
-    plan: string
-    userId: string
-    date: string
-    place?: PlaceDetails
-    myelin?: MyelinDetails
-  }
-  ```
-* Features:
+### Plan Service (planService.ts)
 
-  * State Management (user data, plans, loading states)
-  * Core Functions (setUser, fetchPlans, deletePlan, logout)
-  * Data Processing (filtering, tracking, event separation)
+The application uses a clean API client interface built with axios for handling all plan-related operations.
 
-## II. Screen Components
+```typescript
+export const planService = {
+  // Fetch all plans
+  getAll: () => axiosClient.get('/plan'),
+  
+  // Delete specific event
+  deleteEvent: (eventId: string) => 
+    axiosClient.delete(`/plan/event/${eventId}`),
+  
+  // Batch delete multiple plans
+  deletePlans: (planIds: string[]) => 
+    axiosClient.delete('/plan', { data: { plans: planIds } }),
+  
+  // Clear all planner data
+  clearPlanner: () => 
+    axiosClient.delete('/plan/clear-planner'),
+  
+  // Load test data
+  loadMockData: () => 
+    axiosClient.get('/plan/load-data')
+};
+```
 
-### A. Planner Screen (planner.tsx)
+### API Endpoints
 
-* Main dashboard layout
-* Sections:
-  * Plan section (32.5%) [ Plan.tsx ]
-  * Timeline section (72.5%) [ PlannedDate.tsx ]
-* Safe area implementation
-* Memoized components
 
-### B. Quick Plans Screen (quickplans.tsx)
+| Endpoint              | Method | Description                |
+| --------------------- | ------ | -------------------------- |
+| `/plan`               | GET    | Retrieve all plans         |
+| `/plan/event/:id`     | DELETE | Remove specific event      |
+| `/plan`               | DELETE | Batch delete plans         |
+| `/plan/clear-planner` | DELETE | Clear all planner data     |
+| `/plan/load-data`     | GET    | Load mock data for testing |
 
-* Expiration-based organization
-* Custom header navigation
-* Integration with PlanOptions
+### Implementation Details
 
-## III. UI Components
+* Centralized error handling
+* Type-safe request/response cycles
+* Efficient batch operations
+* Clean separation of concerns
+* Standardized response formatting
 
-### A. Plan Components
+## Project Structure
 
-1. Plan.tsx
-   * Horizontal scrollable cards
-   * Expiration alerts
-   * Modal view implementation for showcasing all plans
-2. PlannedDate.tsx
-   * Timeline visualization
-   * Event stacking
-   * Month-based organization
+```bash
+myelino/
+├── app/
+│   ├── screens/
+│   │   ├── planner.tsx      # Main dashboard
+│   │   └── quickplans.tsx   # Quick plans view
+├── components/       
+│   ├── Plan.tsx            # Plan card component
+│   ├── PlannedDate.tsx     # Timeline visualization
+│   ├── CustomInput.tsx     # Input fields handler
+│   ├── Scroll.tsx          # Navigation options
+│   └── QuickPlanExpiration.tsx  # Expiration handling
+├── services/         
+│   ├── planService.ts      # API client interface
+│   └── planStore.ts        # Zustand state management
+└── helpers/         
+    └── errorHandler.ts     # Error handling utilities
+```
 
-### B. Navigation Components
+## Core Features
 
-1. Scroll.tsx (PlanOptions)
-   * Horizontal navigation
-   * Route-aware styling
-   * Active state management
+### 1. Plan Management
 
-### C. Input Components
+The application handles plans through a robust state management system using Zustand:
 
-1. CustomInput.tsx
-   * Email/password handling
-   * Icon integration
-   * Visibility controls
+```typescript
+interface PlanStore {
+  user: User | null;
+  plans: Plan[];
+  isLoading: boolean;
+  error: string | null;
+  
+  setUser: (user: User) => void;
+  fetchPlans: () => Promise<void>;
+  deletePlan: (id: string) => Promise<void>;
+  logout: () => void;
+}
+```
 
-### D. Quick Plan Components
+Implementation highlights:
 
-1. QuickPlanExpiration.tsx
-   * Expiration grouping
-   * Delete confirmation
-   * Activity indicators
+* Efficient plan filtering and deduplication
+* Type-safe operations
+* Optimized state updates
 
-## IV. Technical Stack
+### 2. Timeline Visualization
 
-* React Native 0.76
-* Expo SDK 52
+Timeline component (PlannedDate.tsx) provides:
 
-Note : Used latest version of expo and react native to use new architecture of bridgeless mode as you can find in app.json and so that i can run the code on my own ios device
+```typescript
+const TimelineComponent = () => {
+  const { plans } = usePlanStore();
+  
+  const getEventDetails = (plan: any): EventDetails | null => {
+    if (plan.place) {
+      return {
+        title: plan.place.placeName.title,
+        description: plan.place.description,
+        mainTag: plan.place.mainTag,
+        subTags: plan.place.subTags,
+        photos: plan.place.photos ?? [],
+        eventCount: plan.place.photos?.length ?? 1
+      };
+    }
+  };
+};
+```
 
-* TypeScript
-* Expo Router
-* Zustand State Management
+Features:
 
-# Why Zustand for State Management
+* Month-based organization
+* Event stacking
+* Photo gallery integration
+* Dynamic content scaling
 
-### Implementation Simplicity
+### 3. Quick Plans System
+
+Implemented in QuickPlanExpiration.tsx:
+
+* Expiration-based grouping
+* Visual alerts
+* Batch operations
+
+### 4. Navigation System
+
+Using Expo Router with custom components:
+
+```typescript
+const PlanOptions = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const handleOptionPress = (option: string) => {
+    if (option === 'Quick Plans') {
+      router.push('/screens/quickplans');
+    }
+  };
+};
+```
+
+## State Management
+
+### Why Zustand?
+
+1. Lightweight Bundle Size
 
 ```typescript
 export const usePlanStore = create<PlanStore>((set) => ({
@@ -110,33 +173,105 @@ export const usePlanStore = create<PlanStore>((set) => ({
   plans: [],
   setUser: (user: User) => set({ user }),
   fetchPlans: async () => {
-    // Simple async logic
   }
 }));
-```
 
-### Direct Component Usage
-
-```typescript
 const { plans, fetchPlans } = usePlanStore();
 ```
 
-### TypeScript Excellence
+2. TypeScript Excellence
 
 * Built-in type inference
-* No extra type packages needed
-* Perfect fit with our existing TypeScript setup
+* No additional type packages needed
 
-### Mobile-First Benefits
+3. Performance Benefits
 
-* Lightweight bundle size
-* Efficient re-rendering
-* Optimized for React Native performance
+* Minimal re-renders
+* Optimized for React Native
+* Efficient updates
 
-## Development Speed
+## Component Architecture
 
-* Quick setup
-* Fast iterations
-* Clear debugging
+### 1. Screen Components
 
-The implementation in `planStore.ts` demonstrates how we manage complex state with minimal code while maintaining full type safety - making Zustand the ideal choice for this React Native project.
+* Planner Screen (32.5% Plan / 72.5% Timeline split)
+* Quick Plans Screen (Expiration-based layout)
+
+### 2. Core Components
+
+Modular design with focused responsibilities:
+
+```typescript
+const PlanCard = ({ title, events, image, onPress }: PlanCardProps) => (
+  <TouchableOpacity style={styles.planCard} onPress={onPress}>
+    <Image source={image} style={styles.planImage} />
+    <View style={styles.planDetails}>
+      <Text style={styles.planTitle}>{title}</Text>
+      <IconGroup icons={events} />
+    </View>
+  </TouchableOpacity>
+);
+```
+
+## Performance Optimizations
+
+### 1. Component Level
+
+* Strategic memoization
+* Efficient re-rendering patterns
+* Image optimization
+
+### 2. Data Management
+
+* Optimized filtering
+* Deduplication strategies
+* Type-safe implementations
+
+## Technical Stack
+
+* React Native 0.76
+* Expo SDK 52
+* TypeScript
+* Expo Router
+* Zustand
+
+## Development Workflow
+
+1. Clone repository
+2. Install dependencies
+3. Configure environment
+4. Start development server
+
+# Important Implementation Notes
+
+## 1. Device & Architecture
+
+* Implemented using Expo SDK 52 and React Native 0.76
+* Leverages new bridgeless architecture
+* Tested on iPhone 15 Pro Max
+* Optimized for modern iOS aspect ratios and screen sizes
+* Fully compatible with Expo Go for development
+
+## 2. Plan Management (Plan.tsx)
+
+### Plan Display Strategy
+
+* Main view shows limited plans with "See More" option
+* Plans ordered by expiration date (nearest to latest)
+* Visual warning system for nearest expiring plan
+* Clear differentiation between regular and quick plans
+
+### Modal Implementation
+
+* Comprehensive modal view for all plans
+* Triggered by "See More" action
+* Maintains consistent styling with main view
+* Scrollable implementation for large plan sets
+
+### User Interactions
+
+* Intuitive deletion through direct plan press
+* Event deletion triggered by long-pressing the event card
+* Confirmation dialog prevents accidental deletions
+* Consistent interaction pattern across all plan types
+* Real-time state updates after deletion

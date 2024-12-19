@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, ScrollView } from "react-native";
+import { View, Text, Image, StyleSheet, ScrollView, Alert, TouchableOpacity } from "react-native";
 import { usePlanStore } from "@/services/planStore";
+import { planService } from "@/services/planService";
 
 const formatTitle = (title: string): string => {
   return title
@@ -32,7 +33,32 @@ interface EventDetails {
 }
 
 const TimelineComponent = () => {
-  const { plans } = usePlanStore();
+  const { plans, refreshPlans } = usePlanStore();
+
+  const handleEventDelete = (eventId: string, eventTitle: string) => {
+    Alert.alert(
+      "Delete Event",
+      `Are you sure you want to delete "${eventTitle}"?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await planService.deleteEvent(eventId);
+              refreshPlans();
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete event");
+            }
+          }
+        }
+      ]
+    );
+  };
 
   const getEventDetails = (plan: any): EventDetails | null => {
     if (plan.place) {
@@ -82,7 +108,10 @@ const TimelineComponent = () => {
                 <Text style={[styles.planTitle, styles.planTitleOutside]}>
                   {formatTitle(plan.plan)}
                 </Text>
-                <View style={styles.eventCard}>
+                <TouchableOpacity
+                  style={styles.eventCard}
+                  onLongPress={() => handleEventDelete(plan._id, eventDetails.title)}
+                >
                   <View style={styles.cardContent}>
                     <View style={styles.eventsSection}>
                       <Text style={styles.eventText}>Events</Text>
@@ -92,6 +121,7 @@ const TimelineComponent = () => {
                     </View>
                     <View style={styles.verticalSeparator} />
                     <Text style={styles.eventTitle}>{eventDetails.title}</Text>
+                    <View style={styles.verticalSeparator} />
                     <View style={styles.imageStack}>
                       {eventDetails.photos.slice(0, 3).map((photo: Photo, photoIndex: number) => (
                         <Image
@@ -99,11 +129,11 @@ const TimelineComponent = () => {
                           style={[
                             styles.eventImage,
                             {
-                              marginLeft: photoIndex * -20,
-                              marginRight: photoIndex * 5,
-                              width: 75 - (photoIndex * 5),
-                              height: 75 - (photoIndex * 5),
-                              zIndex: 10 - photoIndex
+                              width: 75 - (photoIndex * 10),
+                              height: 75 - (photoIndex * 10),
+                              zIndex: 3 - photoIndex,
+                              right: photoIndex * 30,
+                              transform: [{ rotate: `${(2 - photoIndex) * 2}deg` }],
                             }
                           ]}
                           source={{ uri: photo.url }}
@@ -111,7 +141,7 @@ const TimelineComponent = () => {
                       ))}
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -197,7 +227,7 @@ const styles = StyleSheet.create({
     right: -12,
     top: 4,
     transform: [{ rotate: "90deg" }],
-  },  
+  },
   eventCard: {
     backgroundColor: "white",
     borderRadius: 8,
@@ -264,9 +294,14 @@ const styles = StyleSheet.create({
   imageStack: {
     flexDirection: 'row',
     alignItems: 'center',
-    zIndex: 1,
+    position: 'relative',
+    height: 85,
+    width: 95,
+    marginLeft: 20,
   },
   eventImage: {
+    position: 'absolute',
+    right: 0,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: '#fff',

@@ -50,9 +50,7 @@ const TimelineComponent = () => {
           onPress: async () => {
             try {
               await planService.deleteEvent(eventId);
-              // Immediately update the local state by filtering out the deleted event
               setPlans(plans.filter(plan => plan._id !== eventId));
-              // Then refresh from the server
               refreshPlans();
             } catch (error) {
               Alert.alert("Error", "Failed to delete event");
@@ -80,7 +78,10 @@ const TimelineComponent = () => {
         description: plan.myelin.description,
         mainTag: plan.myelin.mainTag,
         subTags: plan.myelin.subTags,
-        photos: plan.myelin.file?.url ? [{ url: plan.myelin.file.url }] : [],
+        photos: [{ 
+          url: plan.myelin.file?.thumbnailUrl || 
+               plan.myelin.file?.url 
+        }],
         eventCount: 1
       };
     }
@@ -136,7 +137,7 @@ const TimelineComponent = () => {
                               height: 75 - (photoIndex * 10),
                               zIndex: 3 - photoIndex,
                               right: photoIndex * 30,
-                              transform: [{ rotate: `${(2 - photoIndex) * 2}deg` }],
+                              // transform: [{ rotate: `${(2 - photoIndex) * 2}deg` }],
                             }
                           ]}
                           source={{ uri: photo.url }}

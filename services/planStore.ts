@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { planService } from '@/services/planService';
 import { errorHandler } from '@/helpers/errorHandler';
+import * as VideoThumbnails from 'expo-video-thumbnails';
 
 interface User {
   id: string;
@@ -25,6 +26,7 @@ interface Place extends PlaceInfo {
 interface Myelin extends PlaceInfo {
   file: {
     url: string;
+    thumbnailUrl?: string;
   };
 }
 
@@ -35,7 +37,14 @@ interface Plan {
   date: string;
   place?: Place;
   myelin?: Myelin;
+  events?: Array<{
+    id: string;
+    name: string;
+    icon: string;
+    type: 'activity' | 'cost';
+  }>;
 }
+
 
 interface PlanStore {
   user: User | null;
@@ -49,6 +58,18 @@ interface PlanStore {
   logout: () => void;
   refreshPlans: () => Promise<void>;
 }
+
+const generateThumbnail = async (videoUrl: string) => {
+  try {
+    const { uri } = await VideoThumbnails.getThumbnailAsync(videoUrl, {
+      time: 0,
+      quality: 0.5,
+    });
+    return uri;
+  } catch (e) {
+    return null;
+  }
+};
 
 export const usePlanStore = create<PlanStore>((set) => ({
   user: null,
@@ -73,9 +94,33 @@ export const usePlanStore = create<PlanStore>((set) => ({
           ))
         );
 
+      const plansWithThumbnails = await Promise.all(
+        userPlans.map(async (plan: Plan) => {
+          if (plan.myelin?.file?.url) {
+            const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
+            if (isVideo) {
+              const thumbnail = await generateThumbnail(plan.myelin.file.url);
+              if (thumbnail) {
+                return {
+                  ...plan,
+                  myelin: {
+                    ...plan.myelin,
+                    file: {
+                      ...plan.myelin.file,
+                      thumbnailUrl: thumbnail
+                    }
+                  }
+                };
+              }
+            }
+          }
+          return plan;
+        })
+      );
+
       const seenEvents = new Set();
 
-      userPlans.forEach((plan: Plan) => {
+      plansWithThumbnails.forEach((plan: Plan) => {
         if (plan.place) {
           const eventKey = `${plan.place.placeName.title}-${plan.place.placeName.address}`;
           if (!seenEvents.has(eventKey)) {
@@ -104,7 +149,7 @@ export const usePlanStore = create<PlanStore>((set) => ({
         }
       });
 
-      set({ plans: userPlans, isLoading: false });
+      set({ plans: plansWithThumbnails, isLoading: false });
     } catch (error) {
       set({ error: errorHandler(error), isLoading: false });
     }
@@ -120,7 +165,32 @@ export const usePlanStore = create<PlanStore>((set) => ({
             p.plan === plan.plan && p.date === plan.date
           ))
         );
-      set({ plans: userPlans });
+
+      const plansWithThumbnails = await Promise.all(
+        userPlans.map(async (plan: Plan) => {
+          if (plan.myelin?.file?.url) {
+            const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
+            if (isVideo) {
+              const thumbnail = await generateThumbnail(plan.myelin.file.url);
+              if (thumbnail) {
+                return {
+                  ...plan,
+                  myelin: {
+                    ...plan.myelin,
+                    file: {
+                      ...plan.myelin.file,
+                      thumbnailUrl: thumbnail
+                    }
+                  }
+                };
+              }
+            }
+          }
+          return plan;
+        })
+      );
+
+      set({ plans: plansWithThumbnails });
     } catch (error) {
       set({ error: errorHandler(error) });
     }

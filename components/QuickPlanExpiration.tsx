@@ -69,8 +69,6 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
     });
   };
 
-  const quickPlansForThisDate = getPlansForExpiryDay();
-
   const handleDeletePlan = (planId: string) => {
     Alert.alert(
       "Delete Plan",
@@ -85,6 +83,8 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
       ]
     );
   };
+
+  const quickPlansForThisDate = getPlansForExpiryDay();
 
   if (quickPlansForThisDate.length === 0) {
     return null;
@@ -103,7 +103,11 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
               { id: '2', name: 'Gym', icon: 'fitness', type: 'activity' },
               { id: '3', name: 'Cost', icon: 'cash-outline', type: 'cost' },
             ]}
-            image={{ uri: plan.place?.photos[0]?.url || plan.myelin?.file?.url }}
+            image={{ 
+              uri: plan.place?.photos[0]?.url || 
+                   plan.myelin?.file?.thumbnailUrl || 
+                   plan.myelin?.file?.url 
+            }}
             onPress={() => handleDeletePlan(plan._id)}
           />
         ))}
@@ -158,7 +162,6 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 12,
     gap: 12,
-    justifyContent: 'space-between',
   },
   planCard: {
     width: '48%',

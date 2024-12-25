@@ -27,6 +27,8 @@
     "expo-splash-screen": "^0.29.18",
     "expo-status-bar": "~2.0.0",
     "expo-system-ui": "~4.0.6",
+    "expo-video": "~2.0.3",
+    "expo-video-thumbnails": "~9.0.2",
     "expo-web-browser": "~14.0.1",
     "metro-resolver": "^0.81.0",
     "myelino-technical-test": "file:",

@@ -12,6 +12,12 @@ interface Event {
   type: 'activity' | 'cost';
 }
 
+const defaultEvents: Event[] = [
+  { id: '1', name: 'Friends', icon: 'people', type: 'activity' },
+  { id: '2', name: 'Activity', icon: 'fitness', type: 'activity' },
+  { id: '3', name: 'Cost', icon: 'cash-outline', type: 'cost' }
+];
+
 interface PlanType {
   id: string;
   title: string;
@@ -47,13 +53,11 @@ const ExpirationAlert = ({ days }: { days: number }) => (
 const IconGroup = ({ icons, type }: { icons: Event[]; type: 'activity' | 'cost' }) => (
   <View style={styles.iconGroup}>
     {icons.filter(event => event.type === type).map((event) => (
-      <View key={event.id} style={styles.iconWithLabel}>
-        <Ionicons name={event.icon} size={18} color="#666" />
-        <Text style={styles.iconLabel}>{event.name}</Text>
-      </View>
+      <Ionicons key={event.id} name={event.icon} size={18} color="#666" />
     ))}
   </View>
 );
+
 
 const PlanCard = ({ title, events, image, onPress, isPlaceholder }: {
   title: string;
@@ -194,7 +198,7 @@ export const Plan = () => {
           expiryDays: daysUntilExpiry,
           planType: plan.plan,
           date: expiryDate,
-          events: plan.events || [],
+          events: defaultEvents,
           image: { 
             uri: plan.place?.photos[0]?.url || 
                  plan.myelin?.file?.thumbnailUrl || 
@@ -384,12 +388,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontFamily: 'RobotoBold',
-  },
-  modalPlansContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'space-between',
   },
   monthSection: {
     marginBottom: 24,

@@ -62,95 +62,124 @@ const TimelineComponent = () => {
   };
 
   const getEventDetails = (plan: any): EventDetails | null => {
+    let eventCount = 0;
+    let photos: Photo[] = [];
+    let details = null;
+
     if (plan.place) {
-      return {
+      eventCount += plan.place.subTags?.length || 0;
+      photos = plan.place.photos || [];
+      details = {
         title: plan.place.placeName.title,
         description: plan.place.description,
         mainTag: plan.place.mainTag,
         subTags: plan.place.subTags,
-        photos: plan.place.photos ?? [],
-        eventCount: plan.place.photos?.length ?? 1
+        photos,
+        eventCount
       };
     }
+
     if (plan.myelin) {
-      return {
+      eventCount += plan.myelin.subTags?.length || 0;
+      const myelinPhoto = plan.myelin.file?.thumbnailUrl || plan.myelin.file?.url;
+      if (myelinPhoto) {
+        photos = [{ url: myelinPhoto }];
+      }
+      details = {
         title: plan.myelin.placeName.title,
         description: plan.myelin.description,
         mainTag: plan.myelin.mainTag,
         subTags: plan.myelin.subTags,
-        photos: [{ 
-          url: plan.myelin.file?.thumbnailUrl || 
-               plan.myelin.file?.url 
-        }],
-        eventCount: 1
+        photos,
+        eventCount
       };
     }
-    return null;
+
+    // Ensure at least one event is counted if there are any details
+    if (details && eventCount === 0) {
+      details.eventCount = 1;
+    }
+
+    return details;
+  };
+
+  const groupPlansByMonth = () => {
+    const groupedPlans = new Map();
+    
+    plans.forEach(plan => {
+      const date = new Date(plan.date);
+      const month = date.toLocaleString('default', { month: 'long' });
+      
+      if (!groupedPlans.has(month)) {
+        groupedPlans.set(month, []);
+      }
+      groupedPlans.get(month).push(plan);
+    });
+
+    return Array.from(groupedPlans.entries());
   };
 
   return (
     <ScrollView style={styles.container}>
-      {plans.map((plan, index) => {
-        const eventDetails = getEventDetails(plan);
-        if (!eventDetails) return null;
+      {groupPlansByMonth().map(([month, monthPlans]) => (
+        <View key={month}>
+          <MonthHeader month={month} />
+          {monthPlans.map((plan: any, index: number) => {
+            const eventDetails = getEventDetails(plan);
+            if (!eventDetails) return null;
 
-        const date = new Date(plan.date);
-        const month = date.toLocaleString('default', { month: 'long' });
-
-        return (
-          <View key={index}>
-            <MonthHeader month={month} />
-            <View style={styles.planContainer}>
-              <View style={styles.timeline}>
-                <View style={styles.outerCircle}>
-                  <View style={styles.circle} />
-                </View>
-                <View style={styles.verticalLine} />
-                <View style={styles.planConnector} />
-              </View>
-              <View style={styles.planWrapper}>
-                <Text style={[styles.planTitle, styles.planTitleOutside]}>
-                  {formatTitle(plan.plan)}
-                </Text>
-                <TouchableOpacity
-                  style={styles.eventCard}
-                  onLongPress={() => handleEventDelete(plan._id, eventDetails.title)}
-                >
-                  <View style={styles.cardContent}>
-                    <View style={styles.eventsSection}>
-                      <Text style={styles.eventText}>Events</Text>
-                      <Text style={styles.eventCount}>
-                        {eventDetails.eventCount}
-                      </Text>
-                    </View>
-                    <View style={styles.verticalSeparator} />
-                    <Text style={styles.eventTitle}>{eventDetails.title}</Text>
-                    <View style={styles.verticalSeparator} />
-                    <View style={styles.imageStack}>
-                      {eventDetails.photos.slice(0, 3).map((photo: Photo, photoIndex: number) => (
-                        <Image
-                          key={photoIndex}
-                          style={[
-                            styles.eventImage,
-                            {
-                              width: 75 - (photoIndex * 10),
-                              height: 75 - (photoIndex * 10),
-                              zIndex: 3 - photoIndex,
-                              right: photoIndex * 30,
-                              // transform: [{ rotate: `${(2 - photoIndex) * 2}deg` }],
-                            }
-                          ]}
-                          source={{ uri: photo.url }}
-                        />
-                      ))}
-                    </View>
+            return (
+              <View key={index} style={styles.planContainer}>
+                <View style={styles.timeline}>
+                  <View style={styles.outerCircle}>
+                    <View style={styles.circle} />
                   </View>
-                </TouchableOpacity>
+                  <View style={styles.verticalLine} />
+                  <View style={styles.planConnector} />
+                </View>
+                <View style={styles.planWrapper}>
+                  <Text style={[styles.planTitle, styles.planTitleOutside]}>
+                    {formatTitle(plan.plan)}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.eventCard}
+                    onLongPress={() => handleEventDelete(plan._id, eventDetails.title)}
+                  >
+                    <View style={styles.cardContent}>
+                      <View style={styles.eventsSection}>
+                        <Text style={styles.eventText}>Events</Text>
+                        <Text style={styles.eventCount}>
+                          {eventDetails.eventCount}
+                        </Text>
+                      </View>
+                      <View style={styles.verticalSeparator} />
+                      <Text style={styles.eventTitle}>{eventDetails.title}</Text>
+                      <View style={styles.verticalSeparator} />
+                      <View style={styles.imageStack}>
+                        {eventDetails.photos.slice(0, 3).map((photo: Photo, photoIndex: number) => (
+                          <Image
+                            key={photoIndex}
+                            style={[
+                              styles.eventImage,
+                              {
+                                width: 75 - (photoIndex * 10),
+                                height: 75 - (photoIndex * 10),
+                                zIndex: 3 - photoIndex,
+                                right: photoIndex * 30,
+                              }
+                            ]}
+                            source={{ uri: photo.url }}
+                          />
+                        ))}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </View>
-        );
-      })}
+            );
+          })}
+        </View>
+      ))}
     </ScrollView>
   );
 };

@@ -1,36 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Image, ImageSourcePropType, Alert, Modal, ScrollView } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Image, Alert, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlanStore } from '@/services/planStore';
-
-type IconName = keyof typeof Ionicons.glyphMap;
-
-interface Event {
-  id: string;
-  name: string;
-  icon: IconName;
-  type: 'activity' | 'cost';
-}
-
-const defaultEvents: Event[] = [
-  { id: '1', name: 'Friends', icon: 'people', type: 'activity' },
-  { id: '2', name: 'Activity', icon: 'fitness', type: 'activity' },
-  { id: '3', name: 'Cost', icon: 'cash-outline', type: 'cost' }
-];
-
-interface PlanType {
-  id: string;
-  title: string;
-  events: Event[];
-  images: string[];
-  expiryDays: number;
-  planType: string;
-  date: Date;
-}
-
-interface GroupedPlans {
-  [key: string]: PlanType[];
-}
 
 const formatTitle = (title: string): string => {
   return title
@@ -50,20 +21,26 @@ const ExpirationAlert = ({ days }: { days: number }) => (
   </View>
 );
 
-const IconGroup = ({ icons, type }: { icons: Event[]; type: 'activity' | 'cost' }) => (
-  <View style={styles.iconGroup}>
-    {icons.filter(event => event.type === type).map((event) => (
-      <Ionicons key={event.id} name={event.icon} size={18} color="#666" />
-    ))}
+const IconGroup = ({ likes, amount }: { likes: number; amount: number }) => (
+  <View style={styles.iconContainer}>
+    <View style={styles.iconGroup}>
+      <Ionicons name="people" size={18} color="#666" />
+      <Text style={styles.iconText}>{likes}</Text>
+    </View>
+    <View style={styles.iconGroup}>
+      <Ionicons name="cash-outline" size={18} color="#666" />
+      <Text style={styles.iconText}>{amount}</Text>
+    </View>
   </View>
 );
 
-const PlanCard = ({ title, events, images, onPress, isPlaceholder }: {
+const PlanCard = ({ title, images, onPress, isPlaceholder, likes = 0, amount = 0 }: {
   title: string;
-  events: Event[];
   images?: string[];
   onPress?: () => void;
   isPlaceholder?: boolean;
+  likes?: number;
+  amount?: number;
 }) => {
   if (isPlaceholder) {
     return (
@@ -83,10 +60,7 @@ const PlanCard = ({ title, events, images, onPress, isPlaceholder }: {
       )}
       <View style={styles.planDetails}>
         <Text style={styles.planTitle}>{title}</Text>
-        <View style={styles.iconContainer}>
-          <IconGroup icons={events} type="activity" />
-          <IconGroup icons={events} type="cost" />
-        </View>
+        <IconGroup likes={likes} amount={amount} />
       </View>
     </TouchableOpacity>
   );
@@ -94,7 +68,7 @@ const PlanCard = ({ title, events, images, onPress, isPlaceholder }: {
 
 const MonthSection = ({ month, plans, onDeletePlan }: {
   month: string;
-  plans: PlanType[];
+  plans: any[];
   onDeletePlan: (id: string) => void;
 }) => (
   <View style={styles.monthSection}>
@@ -104,8 +78,9 @@ const MonthSection = ({ month, plans, onDeletePlan }: {
         <PlanCard
           key={plan.id}
           title={plan.title}
-          events={plan.events}
           images={plan.images}
+          likes={plan.likes}
+          amount={plan.amount}
           onPress={() => onDeletePlan(plan.id)}
         />
       ))}
@@ -135,21 +110,22 @@ export const Plan = () => {
       ]
     );
   };
+
   const getProcessedPlans = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-  
+
     const planMap = new Map();
-  
+
     plans.forEach(plan => {
       const dateString = new Date(plan.date).toISOString().split('T')[0];
       const planKey = `${plan.plan}_${dateString}`;
-  
+
       const expiryDate = new Date(plan.date);
       expiryDate.setHours(0, 0, 0, 0);
       const diffTime = expiryDate.getTime() - today.getTime();
       const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
+
       const images = [];
       if (plan.place?.photos) {
         images.push(...plan.place.photos.map(photo => photo.url));
@@ -157,7 +133,10 @@ export const Plan = () => {
       if (plan.myelin?.file) {
         images.push(plan.myelin.file.thumbnailUrl || plan.myelin.file.url);
       }
-  
+
+      const likes = plan.myelin?.likes?.length || 0;
+      const amount = plan.myelin?.amountPaid || 0;
+
       if (!planMap.has(planKey)) {
         planMap.set(planKey, {
           id: plan._id,
@@ -165,25 +144,26 @@ export const Plan = () => {
           expiryDays: daysUntilExpiry,
           planType: plan.plan,
           date: expiryDate,
-          events: [...defaultEvents], // Always include default events
-          images
+          images,
+          likes,
+          amount
         });
       } else {
         const existingPlan = planMap.get(planKey);
-        existingPlan.events = [...defaultEvents]; // Keep default events for existing plans
         existingPlan.images = [...existingPlan.images, ...images];
-      }
+        existingPlan.likes += likes; // Sum up likes
+        existingPlan.amount += amount; // Sum up amounts
+      }      
     });
-  
+
     return Array.from(planMap.values())
       .filter(plan => plan.expiryDays > 0)
       .sort((a, b) => a.expiryDays - b.expiryDays);
   };
-  
 
   const allPlans = getProcessedPlans();
   const upcomingPlans = allPlans;
-  const nearestExpiryDays = upcomingPlans[0]?.expiryDays || 0;  
+  const nearestExpiryDays = upcomingPlans[0]?.expiryDays || 0;
 
   if (isLoading) {
     return <View style={styles.container} />;
@@ -198,15 +178,15 @@ export const Plan = () => {
             <PlanCard
               key={plan.id}
               title={plan.title}
-              events={plan.events}
               images={plan.images}
+              likes={plan.likes}
+              amount={plan.amount}
               onPress={() => handleDeletePlan(plan.id)}
             />
           ))}
           {allPlans.length > 5 && (
             <PlanCard
               title=""
-              events={[]}
               isPlaceholder
               onPress={() => setModalVisible(true)}
             />
@@ -229,7 +209,7 @@ export const Plan = () => {
             </View>
             <ScrollView>
               {Object.entries(
-                allPlans.reduce<GroupedPlans>((groups, plan) => {
+                allPlans.reduce((groups: any, plan) => {
                   const monthYear = plan.date.toLocaleString('default', { month: 'long', year: 'numeric' });
                   if (!groups[monthYear]) groups[monthYear] = [];
                   groups[monthYear].push(plan);
@@ -239,7 +219,7 @@ export const Plan = () => {
                 <MonthSection
                   key={month}
                   month={month}
-                  plans={plans as PlanType[]}
+                  plans={plans as any[]}
                   onDeletePlan={handleDeletePlan}
                 />
               ))}
@@ -314,6 +294,13 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  planDetails: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
+  },
   planTitle: {
     fontSize: 16,
     fontFamily: 'RobotoBold',
@@ -322,13 +309,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
-  },
-  planDetails: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
   },
   iconContainer: {
     flexDirection: 'row',
@@ -340,6 +320,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.6)',
     padding: 4,
     borderRadius: 12,
+    alignItems: 'center',
+  },
+  iconText: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'RobotoMedium',
   },
   placeholderCard: {
     right: 5,
@@ -402,15 +388,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-  },
-  iconWithLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  iconLabel: {
-    fontSize: 12,
-    color: '#666',
-    fontFamily: 'RobotoRegular',
   }
 });
+
+export default Plan;

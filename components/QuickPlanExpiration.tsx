@@ -3,15 +3,6 @@ import { StyleSheet, Text, TouchableOpacity, View, Image, Alert } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { usePlanStore } from '@/services/planStore';
 
-type IconName = keyof typeof Ionicons.glyphMap;
-
-interface Event {
-  id: string;
-  name: string;
-  icon: IconName;
-  type: 'activity' | 'cost';
-}
-
 const formatTitle = (title: string): string => {
   return title
     .split('_')
@@ -30,19 +21,25 @@ const ExpirationAlert = ({ days }: { days: number }) => (
   </View>
 );
 
-const IconGroup = ({ icons, type }: { icons: Event[]; type: 'activity' | 'cost' }) => (
-  <View style={styles.iconGroup}>
-    {icons.filter(event => event.type === type).map((event) => (
-      <Ionicons key={event.id} name={event.icon} size={18} color="#666" />
-    ))}
+const IconGroup = ({ likes, amount }: { likes: number; amount: number }) => (
+  <View style={styles.iconContainer}>
+    <View style={styles.iconGroup}>
+      <Ionicons name="people" size={18} color="#666" />
+      <Text style={styles.iconText}>{likes}</Text>
+    </View>
+    <View style={styles.iconGroup}>
+      <Ionicons name="cash-outline" size={18} color="#666" />
+      <Text style={styles.iconText}>{amount}</Text>
+    </View>
   </View>
 );
 
-const PlanCard = ({ title, events, images, onPress }: {
+const PlanCard = ({ title, images, onPress, likes = 0, amount = 0 }: {
   title: string;
-  events: Event[];
   images: string[];
   onPress?: () => void;
+  likes?: number;
+  amount?: number;
 }) => (
   <TouchableOpacity style={styles.planCard} onPress={onPress}>
     {images.length > 0 && (
@@ -50,10 +47,7 @@ const PlanCard = ({ title, events, images, onPress }: {
     )}
     <View style={styles.planDetails}>
       <Text style={styles.planTitle}>{title}</Text>
-      <View style={styles.iconContainer}>
-        <IconGroup icons={events} type="activity" />
-        <IconGroup icons={events} type="cost" />
-      </View>
+      <IconGroup likes={likes} amount={amount} />
     </View>
   </TouchableOpacity>
 );
@@ -85,17 +79,22 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
         images.push(plan.myelin.file.thumbnailUrl || plan.myelin.file.url);
       }
 
+      const likes = plan.myelin?.likes?.length || 0;
+      const amount = plan.myelin?.amountPaid || 0;
+
       if (!planMap.has(planKey)) {
         planMap.set(planKey, {
           id: plan._id,
           title: formatTitle(plan.plan),
-          events: [...(plan.events || [])],
-          images
+          images,
+          likes,
+          amount
         });
       } else {
         const existingPlan = planMap.get(planKey);
-        existingPlan.events = [...existingPlan.events, ...(plan.events || [])];
         existingPlan.images = [...existingPlan.images, ...images];
+        existingPlan.likes += likes;
+        existingPlan.amount += amount;
       }
     });
 
@@ -131,12 +130,9 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
           <PlanCard 
             key={plan.id}
             title={plan.title}
-            events={[
-              { id: '1', name: 'Friends', icon: 'heart', type: 'activity' },
-              { id: '2', name: 'Gym', icon: 'fitness', type: 'activity' },
-              { id: '3', name: 'Cost', icon: 'cash-outline', type: 'cost' },
-            ]}
             images={plan.images}
+            likes={plan.likes}
+            amount={plan.amount}
             onPress={() => handleDeletePlan(plan.id)}
           />
         ))}
@@ -144,6 +140,7 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
     </View>
   );
 };
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -233,5 +230,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.6)',
     padding: 4,
     borderRadius: 12,
+    alignItems: 'center',
+  },
+  iconText: {
+    color: '#666',
+    fontSize: 14,
+    fontFamily: 'RobotoMedium',
   }
 });

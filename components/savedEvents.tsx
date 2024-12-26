@@ -132,9 +132,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
   },
   eventTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "600",
-    color: "#333",
+    color: "#008080",
     flex: 1,
     marginHorizontal: 10,
   },

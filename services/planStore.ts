@@ -2,12 +2,13 @@ import { create } from 'zustand';
 import { planService } from '@/services/planService';
 import { errorHandler } from '@/helpers/errorHandler';
 import * as VideoThumbnails from 'expo-video-thumbnails';
-import { Image } from 'react-native';
 
 interface User {
   id: string;
   email: string;
   name: string;
+  avatarUrl?: string; // Optional avatar URL
+  fullName?: string; // Optional full name
 }
 
 interface PlaceInfo {
@@ -29,6 +30,10 @@ interface Myelin extends PlaceInfo {
     url: string;
     thumbnailUrl?: string;
   };
+  amountPaid?: number; // Added amountPaid
+  currency?: string; // Added currency
+  views?: number; // Added views
+  likes?: string[]; // Added likes
 }
 
 interface Plan {
@@ -44,11 +49,20 @@ interface Plan {
     icon: string;
     type: 'activity' | 'cost';
   }>;
+  user?: User; // Added user information
+}
+
+interface PlanAnalysis {
+  planId: string;
+  planName: string;
+  eventCount: number;
+  mediaUrls: string[];
 }
 
 interface PlanStore {
   user: User | null;
   plans: Plan[];
+  plansAnalysis: PlanAnalysis[];
   isLoading: boolean;
   error: string | null;
   setUser: (user: User) => void;
@@ -59,77 +73,37 @@ interface PlanStore {
   refreshPlans: () => Promise<void>;
 }
 
-const thumbnailCache = new Map<string, string>();
-
 const generateThumbnail = async (videoUrl: string) => {
-  if (thumbnailCache.has(videoUrl)) {
-    return thumbnailCache.get(videoUrl);
-  }
   try {
     const { uri } = await VideoThumbnails.getThumbnailAsync(videoUrl, {
       time: 0,
       quality: 0.5,
     });
-    thumbnailCache.set(videoUrl, uri);
     return uri;
   } catch (e) {
     return null;
   }
 };
 
-const optimizeMediaQuality = (url: string, width = 300) => {
-  return `${url}?width=${width}&quality=75`;
-};
-
-const preloadNextBatch = async (plans: Plan[]) => {
-  const upcomingPlans = plans.slice(0, 5);
-  upcomingPlans.forEach(plan => {
-    if (plan.myelin?.file?.url) {
-      Image.prefetch(optimizeMediaQuality(plan.myelin.file.url));
-    }
-    if (plan.place?.photos) {
-      plan.place.photos.forEach(photo => Image.prefetch(optimizeMediaQuality(photo.url)));
-    }
+const analyzePlans = (plans: Plan[]): PlanAnalysis[] => {
+  return plans.map(plan => {
+    const eventCount = plan.events?.length || 0;
+    const photoUrls = plan.place?.photos?.map(photo => photo.url) || [];
+    const videoUrl = plan.myelin?.file?.url;
+    
+    return {
+      planId: plan._id,
+      planName: plan.plan,
+      eventCount,
+      mediaUrls: [...photoUrls, videoUrl].filter((url): url is string => url !== undefined)
+    };
   });
-};
-
-const processMediaForPlan = async (plan: Plan) => {
-  if (plan.myelin?.file?.url) {
-    const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
-    if (isVideo) {
-      const thumbnail = await generateThumbnail(plan.myelin.file.url);
-      if (thumbnail) {
-        return {
-          ...plan,
-          myelin: {
-            ...plan.myelin,
-            file: {
-              ...plan.myelin.file,
-              thumbnailUrl: thumbnail
-            }
-          }
-        };
-      }
-    }
-  }
-  return plan;
-};
-
-const loadMediaInBatches = async (plans: Plan[], batchSize = 3) => {
-  const results = [];
-  for (let i = 0; i < plans.length; i += batchSize) {
-    const batch = plans.slice(i, i + batchSize);
-    const batchResults = await Promise.all(
-      batch.map(plan => processMediaForPlan(plan))
-    );
-    results.push(...batchResults);
-  }
-  return results;
 };
 
 export const usePlanStore = create<PlanStore>((set) => ({
   user: null,
   plans: [],
+  plansAnalysis: [],
   isLoading: false,
   error: null,
 
@@ -142,49 +116,106 @@ export const usePlanStore = create<PlanStore>((set) => ({
     }
     try {
       const response = await planService.getAll();
-
+      console.log('API Response Plans:', response.data.allplans); // Log only the plans
+  
       const userPlans = response.data.allplans
         .filter((plan: Plan) => plan.userId === usePlanStore.getState().user?.id)
         .filter((plan: Plan, index: number, self: Plan[]) =>
           index === self.findIndex((p) => (
-            p.plan === plan.plan && p.date === p.date
+            p.plan === plan.plan && p.date === plan.date
           ))
         );
-
-      const processedPlans = await loadMediaInBatches(userPlans);
-      await preloadNextBatch(processedPlans);
-
-      set({ plans: processedPlans, isLoading: false });
+  
+      const plansWithThumbnails = await Promise.all(
+        userPlans.map(async (plan: Plan) => {
+          if (plan.myelin?.file?.url) {
+            const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
+            if (isVideo) {
+              const thumbnail = await generateThumbnail(plan.myelin.file.url);
+              if (thumbnail) {
+                return {
+                  ...plan,
+                  myelin: {
+                    ...plan.myelin,
+                    file: {
+                      ...plan.myelin.file,
+                      thumbnailUrl: thumbnail
+                    }
+                  }
+                };
+              }
+            }
+          }
+          return plan;
+        })
+      );
+  
+      const analysis = analyzePlans(plansWithThumbnails);
+  
+      set({ 
+        plans: plansWithThumbnails, 
+        plansAnalysis: analysis,
+        isLoading: false 
+      });
     } catch (error) {
       set({ error: errorHandler(error), isLoading: false });
     }
   },
-
+  
   refreshPlans: async () => {
     try {
       const response = await planService.getAll();
+      console.log('API Response Plans:', response.data.allplans); // Log only the plans
       const userPlans = response.data.allplans
         .filter((plan: Plan) => plan.userId === usePlanStore.getState().user?.id)
         .filter((plan: Plan, index: number, self: Plan[]) =>
           index === self.findIndex((p) => (
-            p.plan === plan.plan && p.date === p.date
+            p.plan === plan.plan && p.date === plan.date
           ))
         );
-
-      const processedPlans = await loadMediaInBatches(userPlans);
-      await preloadNextBatch(processedPlans);
-
-      set({ plans: processedPlans });
+  
+      const plansWithThumbnails = await Promise.all(
+        userPlans.map(async (plan: Plan) => {
+          if (plan.myelin?.file?.url) {
+            const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
+            if (isVideo) {
+              const thumbnail = await generateThumbnail(plan.myelin.file.url);
+              if (thumbnail) {
+                return {
+                  ...plan,
+                  myelin: {
+                    ...plan.myelin,
+                    file: {
+                      ...plan.myelin.file,
+                      thumbnailUrl: thumbnail
+                    }
+                  }
+                };
+              }
+            }
+          }
+          return plan;
+        })
+      );
+  
+      const analysis = analyzePlans(plansWithThumbnails);
+      console.log('Plans Analysis:', analysis); // Log the analysis of plans
+  
+      set({ 
+        plans: plansWithThumbnails,
+        plansAnalysis: analysis
+      });
     } catch (error) {
       set({ error: errorHandler(error) });
     }
-  },
+  },  
 
   deletePlan: async (id: string) => {
     try {
       await planService.deletePlans([id]);
       set((state) => ({
-        plans: state.plans.filter(plan => plan._id !== id)
+        plans: state.plans.filter(plan => plan._id !== id),
+        plansAnalysis: state.plansAnalysis.filter(analysis => analysis.planId !== id)
       }));
     } catch (error) {
       set({ error: errorHandler(error) });
@@ -192,10 +223,10 @@ export const usePlanStore = create<PlanStore>((set) => ({
   },
 
   logout: () => {
-    thumbnailCache.clear();
     set({
       user: null,
       plans: [],
+      plansAnalysis: [],
       error: null
     });
   }

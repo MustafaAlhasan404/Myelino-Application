@@ -1,7 +1,8 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, Alert, TouchableOpacity } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { usePlanStore } from "@/services/planStore";
 import { planService } from "@/services/planService";
+import { router } from 'expo-router';
 
 const formatTitle = (title: string): string => {
   return title
@@ -34,32 +35,6 @@ interface EventDetails {
 
 const TimelineComponent = () => {
   const { plans, setPlans, refreshPlans } = usePlanStore();
-
-  const handleEventDelete = (eventId: string, eventTitle: string) => {
-    Alert.alert(
-      "Delete Event",
-      `Are you sure you want to delete "${eventTitle}"?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await planService.deleteEvent(eventId);
-              setPlans(plans.filter(plan => plan._id !== eventId));
-              refreshPlans();
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete event");
-            }
-          }
-        }
-      ]
-    );
-  };
 
   const getEventDetails = (plan: any): EventDetails | null => {
     let eventCount = 0;
@@ -182,11 +157,14 @@ const TimelineComponent = () => {
                 </View>
                 <View style={styles.planWrapper}>
                   <Text style={[styles.planTitle, styles.planTitleOutside]}>
-                    {formatTitle(plan.plan)}
+                    {`Plan ${index + 1}`}
                   </Text>
                   <TouchableOpacity
                     style={styles.eventCard}
-                    onLongPress={() => handleEventDelete(plan._id, eventDetails.title)}
+                    onPress={() => router.push({
+                      pathname: "/screens/PlanEvents",
+                      params: { id: plan._id }
+                    })}                    
                   >
                     <View style={styles.cardContent}>
                       <View style={styles.eventsSection}>
@@ -196,7 +174,7 @@ const TimelineComponent = () => {
                         </Text>
                       </View>
                       <View style={styles.verticalSeparator} />
-                      <Text style={styles.eventTitle}>{eventDetails.title}</Text>
+                      <Text style={styles.eventTitle}>{formatTitle(plan.plan)}</Text>
                       <View style={styles.verticalSeparator} />
                       <View style={styles.imageStack}>
                         {plan._allPhotos.slice(0, 3).map((photo: Photo, photoIndex: number) => (

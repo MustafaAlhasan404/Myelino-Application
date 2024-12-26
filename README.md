@@ -67,16 +67,16 @@ myelino/
 │   ├── screens/
 │   │   ├── planner.tsx      # Main dashboard
 │   │   └── quickplans.tsx   # Quick plans view
-├── components/     
+├── components/   
 │   ├── Plan.tsx            # Plan card component
 │   ├── PlannedDate.tsx     # Timeline visualization
 │   ├── CustomInput.tsx     # Input fields handler
 │   ├── Scroll.tsx          # Navigation options
 │   └── QuickPlanExpiration.tsx  # Expiration handling
-├── services/       
+├── services/   
 │   ├── planService.ts      # API client interface
 │   └── planStore.ts        # Zustand state management
-└── helpers/       
+└── helpers/   
     └── errorHandler.ts     # Error handling utilities
 ```
 
@@ -276,5 +276,22 @@ const PlanCard = ({ title, events, image, onPress }: PlanCardProps) => (
 * Consistent interaction pattern across all plan types
 * Real-time state updates after deletion
 
-## 2. Problem
-Image seem to take too long to load
+
+## New Features
+
+* Integrated date and greeting section in `planner.tsx`
+* Implemented SavedEvents component for comprehensive event management
+* Developed custom SearchBar component with Figma-compliant UI and search icon integration
+* Added dynamic "See All" visibility logic based on plan count (visible when plans exceed 5)
+* Enhanced scrolling functionality for components following `Scroll.tsx`
+* Introduced PlanEvents screen for detailed event visualization
+* Integrated likes counter and payment amount indicators with API data fetching
+
+## Improvements
+
+* Optimized code structure to eliminate redundancy
+* Simplified event deletion workflow in PlanEvents.tsx by replacing long-press with single-press action
+
+## Pending Tasks
+
+* Validation testing for dynamic "See All" functionality pending data population

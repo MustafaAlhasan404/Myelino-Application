@@ -22,7 +22,7 @@ interface PlanType {
   id: string;
   title: string;
   events: Event[];
-  image: ImageSourcePropType;
+  images: string[];
   expiryDays: number;
   planType: string;
   date: Date;
@@ -58,11 +58,10 @@ const IconGroup = ({ icons, type }: { icons: Event[]; type: 'activity' | 'cost' 
   </View>
 );
 
-
-const PlanCard = ({ title, events, image, onPress, isPlaceholder }: {
+const PlanCard = ({ title, events, images, onPress, isPlaceholder }: {
   title: string;
   events: Event[];
-  image?: ImageSourcePropType;
+  images?: string[];
   onPress?: () => void;
   isPlaceholder?: boolean;
 }) => {
@@ -79,7 +78,9 @@ const PlanCard = ({ title, events, image, onPress, isPlaceholder }: {
 
   return (
     <TouchableOpacity style={styles.planCard} onPress={onPress}>
-      <Image source={image!} style={styles.planImage} />
+      {images && images.length > 0 && (
+        <Image source={{ uri: images[0] }} style={styles.planImage} />
+      )}
       <View style={styles.planDetails}>
         <Text style={styles.planTitle}>{title}</Text>
         <View style={styles.iconContainer}>
@@ -104,7 +105,7 @@ const MonthSection = ({ month, plans, onDeletePlan }: {
           key={plan.id}
           title={plan.title}
           events={plan.events}
-          image={plan.image}
+          images={plan.images}
           onPress={() => onDeletePlan(plan.id)}
         />
       ))}
@@ -112,56 +113,10 @@ const MonthSection = ({ month, plans, onDeletePlan }: {
   </View>
 );
 
-const AllPlansModal = ({ visible, onClose, groupedPlans, onDeletePlan }: {
-  visible: boolean;
-  onClose: () => void;
-  groupedPlans: GroupedPlans;
-  onDeletePlan: (id: string) => void;
-}) => (
-  <Modal
-    animationType="fade"
-    transparent={true}
-    visible={visible}
-    onRequestClose={onClose}
-  >
-    <View style={styles.modalContainer}>
-      <View style={styles.modalContent}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>All Plans</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color="#000" />
-          </TouchableOpacity>
-        </View>
-        <ScrollView>
-          {Object.entries(groupedPlans).map(([month, plans]) => (
-            <MonthSection
-              key={month}
-              month={month}
-              plans={plans}
-              onDeletePlan={onDeletePlan}
-            />
-          ))}
-        </ScrollView>
-      </View>
-    </View>
-  </Modal>
-);
-
-const groupPlansByMonth = (plans: PlanType[]): GroupedPlans => {
-  return plans.reduce((groups, plan) => {
-    const monthYear = new Date(plan.date).toLocaleString('default', { month: 'long', year: 'numeric' });
-    if (!groups[monthYear]) {
-      groups[monthYear] = [];
-    }
-    groups[monthYear].push(plan);
-    return groups;
-  }, {} as GroupedPlans);
-};
-
 export const Plan = () => {
   const { plans, isLoading, fetchPlans, deletePlan } = usePlanStore();
   const [modalVisible, setModalVisible] = useState(false);
-  
+
   useEffect(() => {
     fetchPlans();
   }, []);
@@ -180,40 +135,55 @@ export const Plan = () => {
       ]
     );
   };
-
   const getProcessedPlans = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    return plans
-      .map(plan => {
-        const expiryDate = new Date(plan.date);
-        expiryDate.setHours(0, 0, 0, 0);
-        const diffTime = expiryDate.getTime() - today.getTime();
-        const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        
-        return {
+  
+    const planMap = new Map();
+  
+    plans.forEach(plan => {
+      const dateString = new Date(plan.date).toISOString().split('T')[0];
+      const planKey = `${plan.plan}_${dateString}`;
+  
+      const expiryDate = new Date(plan.date);
+      expiryDate.setHours(0, 0, 0, 0);
+      const diffTime = expiryDate.getTime() - today.getTime();
+      const daysUntilExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+      const images = [];
+      if (plan.place?.photos) {
+        images.push(...plan.place.photos.map(photo => photo.url));
+      }
+      if (plan.myelin?.file) {
+        images.push(plan.myelin.file.thumbnailUrl || plan.myelin.file.url);
+      }
+  
+      if (!planMap.has(planKey)) {
+        planMap.set(planKey, {
           id: plan._id,
           title: formatTitle(plan.plan),
           expiryDays: daysUntilExpiry,
           planType: plan.plan,
           date: expiryDate,
-          events: defaultEvents,
-          image: { 
-            uri: plan.place?.photos[0]?.url || 
-                 plan.myelin?.file?.thumbnailUrl || 
-                 plan.myelin?.file?.url 
-          },
-        } as PlanType;
-      })
+          events: [...defaultEvents], // Always include default events
+          images
+        });
+      } else {
+        const existingPlan = planMap.get(planKey);
+        existingPlan.events = [...defaultEvents]; // Keep default events for existing plans
+        existingPlan.images = [...existingPlan.images, ...images];
+      }
+    });
+  
+    return Array.from(planMap.values())
       .filter(plan => plan.expiryDays > 0)
       .sort((a, b) => a.expiryDays - b.expiryDays);
   };
+  
 
   const allPlans = getProcessedPlans();
-  const upcomingPlans = allPlans.filter(plan => plan.expiryDays <= 30).slice(0, 2);
-  const groupedPlans = groupPlansByMonth(allPlans);
-  const nearestExpiryDays = upcomingPlans[0]?.expiryDays || 0;
+  const upcomingPlans = allPlans;
+  const nearestExpiryDays = upcomingPlans[0]?.expiryDays || 0;  
 
   if (isLoading) {
     return <View style={styles.container} />;
@@ -222,31 +192,61 @@ export const Plan = () => {
   return (
     <View style={styles.container}>
       {upcomingPlans.length > 0 && <ExpirationAlert days={nearestExpiryDays} />}
-      <View style={styles.plansContainer}>
-        {upcomingPlans.map((plan) => (
-          <PlanCard 
-            key={plan.id}
-            title={plan.title}
-            events={plan.events}
-            image={plan.image}
-            onPress={() => handleDeletePlan(plan.id)}
-          />
-        ))}
-        {allPlans.length > 2 && (
-          <PlanCard 
-            title="" 
-            events={[]} 
-            isPlaceholder 
-            onPress={() => setModalVisible(true)} 
-          />
-        )}
-      </View>
-      <AllPlansModal
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.plansContainer}>
+          {upcomingPlans.map((plan) => (
+            <PlanCard
+              key={plan.id}
+              title={plan.title}
+              events={plan.events}
+              images={plan.images}
+              onPress={() => handleDeletePlan(plan.id)}
+            />
+          ))}
+          {allPlans.length > 5 && (
+            <PlanCard
+              title=""
+              events={[]}
+              isPlaceholder
+              onPress={() => setModalVisible(true)}
+            />
+          )}
+        </View>
+      </ScrollView>
+      <Modal
+        animationType="fade"
+        transparent={true}
         visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        groupedPlans={groupedPlans}
-        onDeletePlan={handleDeletePlan}
-      />
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>All Plans</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {Object.entries(
+                allPlans.reduce<GroupedPlans>((groups, plan) => {
+                  const monthYear = plan.date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                  if (!groups[monthYear]) groups[monthYear] = [];
+                  groups[monthYear].push(plan);
+                  return groups;
+                }, {})
+              ).map(([month, plans]) => (
+                <MonthSection
+                  key={month}
+                  month={month}
+                  plans={plans as PlanType[]}
+                  onDeletePlan={handleDeletePlan}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -296,6 +296,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingHorizontal: 12,
     gap: 12,
+    flexWrap: 'nowrap',
   },
   planCard: {
     width: 150,
@@ -313,13 +314,6 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
-  planDetails: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 12,
-  },
   planTitle: {
     fontSize: 16,
     fontFamily: 'RobotoBold',
@@ -328,6 +322,13 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  planDetails: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 12,
   },
   iconContainer: {
     flexDirection: 'row',

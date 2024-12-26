@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Image, StyleSheet, ScrollView, Alert, TouchableOpacity } from "react-native";
+import { View, Text, Image, StyleSheet, Alert, TouchableOpacity } from "react-native";
 import { usePlanStore } from "@/services/planStore";
 import { planService } from "@/services/planService";
 
@@ -65,39 +65,43 @@ const TimelineComponent = () => {
     let eventCount = 0;
     let photos: Photo[] = [];
     let details = null;
+    let title = '';
+    let description = '';
+    let mainTag = '';
+    let subTags: string[] = [];
 
     if (plan.place) {
       eventCount += plan.place.subTags?.length || 0;
-      photos = plan.place.photos || [];
-      details = {
-        title: plan.place.placeName.title,
-        description: plan.place.description,
-        mainTag: plan.place.mainTag,
-        subTags: plan.place.subTags,
-        photos,
-        eventCount
-      };
+      photos = [...photos, ...(plan.place.photos || [])];
+      title = plan.place.placeName.title;
+      description = plan.place.description;
+      mainTag = plan.place.mainTag;
+      subTags = [...subTags, ...(plan.place.subTags || [])];
     }
 
     if (plan.myelin) {
       eventCount += plan.myelin.subTags?.length || 0;
       const myelinPhoto = plan.myelin.file?.thumbnailUrl || plan.myelin.file?.url;
       if (myelinPhoto) {
-        photos = [{ url: myelinPhoto }];
+        photos = [...photos, { url: myelinPhoto }];
       }
-      details = {
-        title: plan.myelin.placeName.title,
-        description: plan.myelin.description,
-        mainTag: plan.myelin.mainTag,
-        subTags: plan.myelin.subTags,
-        photos,
-        eventCount
-      };
+      if (!title) {
+        title = plan.myelin.placeName.title;
+        description = plan.myelin.description;
+        mainTag = plan.myelin.mainTag;
+      }
+      subTags = [...subTags, ...(plan.myelin.subTags || [])];
     }
 
-    // Ensure at least one event is counted if there are any details
-    if (details && eventCount === 0) {
-      details.eventCount = 1;
+    if (title) {
+      details = {
+        title,
+        description,
+        mainTag,
+        subTags,
+        photos,
+        eventCount: Math.max(eventCount, 1)
+      };
     }
 
     return details;
@@ -109,18 +113,57 @@ const TimelineComponent = () => {
     plans.forEach(plan => {
       const date = new Date(plan.date);
       const month = date.toLocaleString('default', { month: 'long' });
+      const dateString = date.toISOString().split('T')[0];
       
       if (!groupedPlans.has(month)) {
-        groupedPlans.set(month, []);
+        groupedPlans.set(month, new Map());
       }
-      groupedPlans.get(month).push(plan);
+      
+      const monthPlans = groupedPlans.get(month);
+      const planKey = `${plan.plan}_${dateString}`;
+      
+      if (!monthPlans.has(planKey)) {
+        monthPlans.set(planKey, {
+          ...plan,
+          place: plan.place ? { ...plan.place } : undefined,
+          myelin: plan.myelin ? { ...plan.myelin } : undefined,
+          events: [...(plan.events || [])],
+          _allPhotos: plan.place?.photos || []
+        });
+        if (plan.myelin?.file) {
+          monthPlans.get(planKey)._allPhotos.push({ 
+            url: plan.myelin.file.thumbnailUrl || plan.myelin.file.url 
+          });
+        }
+      } else {
+        const existingPlan = monthPlans.get(planKey);
+        existingPlan.events = [...(existingPlan.events || []), ...(plan.events || [])];
+        
+        if (plan.place) {
+          existingPlan.place = existingPlan.place || plan.place;
+          if (plan.place.photos) {
+            existingPlan._allPhotos = [...existingPlan._allPhotos, ...plan.place.photos];
+          }
+        }
+        if (plan.myelin) {
+          existingPlan.myelin = existingPlan.myelin || plan.myelin;
+          if (plan.myelin.file) {
+            existingPlan._allPhotos.push({ 
+              url: plan.myelin.file.thumbnailUrl || plan.myelin.file.url 
+            });
+          }
+        }
+      }
     });
-
-    return Array.from(groupedPlans.entries());
+    
+    return Array.from(groupedPlans.entries()).map(([month, monthPlans]) => [
+      month,
+      Array.from(monthPlans.values())
+    ]);
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       {groupPlansByMonth().map(([month, monthPlans]) => (
         <View key={month}>
           <MonthHeader month={month} />
@@ -156,7 +199,7 @@ const TimelineComponent = () => {
                       <Text style={styles.eventTitle}>{eventDetails.title}</Text>
                       <View style={styles.verticalSeparator} />
                       <View style={styles.imageStack}>
-                        {eventDetails.photos.slice(0, 3).map((photo: Photo, photoIndex: number) => (
+                        {plan._allPhotos.slice(0, 3).map((photo: Photo, photoIndex: number) => (
                           <Image
                             key={photoIndex}
                             style={[
@@ -180,7 +223,7 @@ const TimelineComponent = () => {
           })}
         </View>
       ))}
-    </ScrollView>
+    </View>
   );
 };
 

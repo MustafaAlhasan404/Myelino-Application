@@ -9,24 +9,11 @@ const PlanOptions = () => {
   const handleOptionPress = (option: string) => {
     if (option === 'Quick Plans' && pathname !== '/screens/quickplans') {
       router.push('/screens/quickplans');
-    } else if (option === 'Home' && pathname !== '/screens/planner') {
-      router.push('/screens/planner');
     }
   };
 
   return (
     <View style={styles.optionsContainer}>
-      <TouchableOpacity
-        style={styles.optionButton}
-        onPress={() => handleOptionPress('Home')}
-      >
-        <Text style={[
-          styles.optionText,
-          pathname === '/screens/planner' && styles.activeOption
-        ]}>
-          Home
-        </Text>
-      </TouchableOpacity>
       <TouchableOpacity
         style={styles.optionButton}
         onPress={() => handleOptionPress('Quick Plans')}
@@ -64,6 +51,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     marginRight: 8,
+    backgroundColor: '#FDFDFD', // Light white/gray background
+    borderRadius: 16, // Optional: adds rounded corners
   },
   optionText: {
     color: '#666666',

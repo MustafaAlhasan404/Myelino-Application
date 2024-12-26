@@ -36,7 +36,7 @@ export default function QuickPlansScreen() {
   const [uniqueExpiryDays, setUniqueExpiryDays] = useState<number[]>([]);
 
   useEffect(() => {
-    navigation.setOptions({ gestureEnabled: false });
+    navigation.setOptions;
     fetchPlans();
   }, []);
 

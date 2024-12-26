@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, Image, ImageSourcePropType, Alert } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, Image, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { usePlanStore } from '@/services/planStore';
 
@@ -38,14 +38,16 @@ const IconGroup = ({ icons, type }: { icons: Event[]; type: 'activity' | 'cost' 
   </View>
 );
 
-const PlanCard = ({ title, events, image, onPress }: {
+const PlanCard = ({ title, events, images, onPress }: {
   title: string;
   events: Event[];
-  image: ImageSourcePropType;
+  images: string[];
   onPress?: () => void;
 }) => (
   <TouchableOpacity style={styles.planCard} onPress={onPress}>
-    <Image source={image} style={styles.planImage} />
+    {images.length > 0 && (
+      <Image source={{ uri: images[0] }} style={styles.planImage} />
+    )}
     <View style={styles.planDetails}>
       <Text style={styles.planTitle}>{title}</Text>
       <View style={styles.iconContainer}>
@@ -61,12 +63,43 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
 
   const getPlansForExpiryDay = () => {
     const today = new Date();
-    return plans.filter(plan => {
+    const planMap = new Map();
+
+    plans.forEach(plan => {
+      if (plan.plan !== "Quick") return;
+
       const planDate = new Date(plan.date);
       const diffTime = planDate.getTime() - today.getTime();
       const daysDiff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return daysDiff === expiresIn && plan.plan === "Quick";
+      
+      if (daysDiff !== expiresIn) return;
+
+      const dateString = planDate.toISOString().split('T')[0];
+      const planKey = `${plan.plan}_${dateString}`;
+      
+      const images = [];
+      if (plan.place?.photos) {
+        images.push(...plan.place.photos.map(photo => photo.url));
+      }
+      if (plan.myelin?.file) {
+        images.push(plan.myelin.file.thumbnailUrl || plan.myelin.file.url);
+      }
+
+      if (!planMap.has(planKey)) {
+        planMap.set(planKey, {
+          id: plan._id,
+          title: formatTitle(plan.plan),
+          events: [...(plan.events || [])],
+          images
+        });
+      } else {
+        const existingPlan = planMap.get(planKey);
+        existingPlan.events = [...existingPlan.events, ...(plan.events || [])];
+        existingPlan.images = [...existingPlan.images, ...images];
+      }
     });
+
+    return Array.from(planMap.values());
   };
 
   const handleDeletePlan = (planId: string) => {
@@ -96,26 +129,21 @@ export const QuickPlan = ({ expiresIn }: { expiresIn: number }) => {
       <View style={styles.plansContainer}>
         {quickPlansForThisDate.map((plan) => (
           <PlanCard 
-            key={plan._id}
-            title={formatTitle(plan.plan)}
+            key={plan.id}
+            title={plan.title}
             events={[
               { id: '1', name: 'Friends', icon: 'heart', type: 'activity' },
               { id: '2', name: 'Gym', icon: 'fitness', type: 'activity' },
               { id: '3', name: 'Cost', icon: 'cash-outline', type: 'cost' },
             ]}
-            image={{ 
-              uri: plan.place?.photos[0]?.url || 
-                   plan.myelin?.file?.thumbnailUrl || 
-                   plan.myelin?.file?.url 
-            }}
-            onPress={() => handleDeletePlan(plan._id)}
+            images={plan.images}
+            onPress={() => handleDeletePlan(plan.id)}
           />
         ))}
       </View>
     </View>
   );
 };
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,

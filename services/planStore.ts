@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { planService } from '@/services/planService';
 import { errorHandler } from '@/helpers/errorHandler';
 import * as VideoThumbnails from 'expo-video-thumbnails';
+import { Image } from 'react-native';
 
 interface User {
   id: string;
@@ -45,7 +46,6 @@ interface Plan {
   }>;
 }
 
-
 interface PlanStore {
   user: User | null;
   plans: Plan[];
@@ -59,16 +59,72 @@ interface PlanStore {
   refreshPlans: () => Promise<void>;
 }
 
+const thumbnailCache = new Map<string, string>();
+
 const generateThumbnail = async (videoUrl: string) => {
+  if (thumbnailCache.has(videoUrl)) {
+    return thumbnailCache.get(videoUrl);
+  }
   try {
     const { uri } = await VideoThumbnails.getThumbnailAsync(videoUrl, {
       time: 0,
       quality: 0.5,
     });
+    thumbnailCache.set(videoUrl, uri);
     return uri;
   } catch (e) {
     return null;
   }
+};
+
+const optimizeMediaQuality = (url: string, width = 300) => {
+  return `${url}?width=${width}&quality=75`;
+};
+
+const preloadNextBatch = async (plans: Plan[]) => {
+  const upcomingPlans = plans.slice(0, 5);
+  upcomingPlans.forEach(plan => {
+    if (plan.myelin?.file?.url) {
+      Image.prefetch(optimizeMediaQuality(plan.myelin.file.url));
+    }
+    if (plan.place?.photos) {
+      plan.place.photos.forEach(photo => Image.prefetch(optimizeMediaQuality(photo.url)));
+    }
+  });
+};
+
+const processMediaForPlan = async (plan: Plan) => {
+  if (plan.myelin?.file?.url) {
+    const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
+    if (isVideo) {
+      const thumbnail = await generateThumbnail(plan.myelin.file.url);
+      if (thumbnail) {
+        return {
+          ...plan,
+          myelin: {
+            ...plan.myelin,
+            file: {
+              ...plan.myelin.file,
+              thumbnailUrl: thumbnail
+            }
+          }
+        };
+      }
+    }
+  }
+  return plan;
+};
+
+const loadMediaInBatches = async (plans: Plan[], batchSize = 3) => {
+  const results = [];
+  for (let i = 0; i < plans.length; i += batchSize) {
+    const batch = plans.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(plan => processMediaForPlan(plan))
+    );
+    results.push(...batchResults);
+  }
+  return results;
 };
 
 export const usePlanStore = create<PlanStore>((set) => ({
@@ -86,70 +142,19 @@ export const usePlanStore = create<PlanStore>((set) => ({
     }
     try {
       const response = await planService.getAll();
+
       const userPlans = response.data.allplans
         .filter((plan: Plan) => plan.userId === usePlanStore.getState().user?.id)
         .filter((plan: Plan, index: number, self: Plan[]) =>
           index === self.findIndex((p) => (
-            p.plan === plan.plan && p.date === plan.date
+            p.plan === plan.plan && p.date === p.date
           ))
         );
 
-      const plansWithThumbnails = await Promise.all(
-        userPlans.map(async (plan: Plan) => {
-          if (plan.myelin?.file?.url) {
-            const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
-            if (isVideo) {
-              const thumbnail = await generateThumbnail(plan.myelin.file.url);
-              if (thumbnail) {
-                return {
-                  ...plan,
-                  myelin: {
-                    ...plan.myelin,
-                    file: {
-                      ...plan.myelin.file,
-                      thumbnailUrl: thumbnail
-                    }
-                  }
-                };
-              }
-            }
-          }
-          return plan;
-        })
-      );
+      const processedPlans = await loadMediaInBatches(userPlans);
+      await preloadNextBatch(processedPlans);
 
-      const seenEvents = new Set();
-
-      plansWithThumbnails.forEach((plan: Plan) => {
-        if (plan.place) {
-          const eventKey = `${plan.place.placeName.title}-${plan.place.placeName.address}`;
-          if (!seenEvents.has(eventKey)) {
-            seenEvents.add(eventKey);
-            console.log('Place Event:', {
-              title: plan.place.placeName.title,
-              address: plan.place.placeName.address,
-              description: plan.place.description,
-              mainTag: plan.place.mainTag,
-              subTags: plan.place.subTags
-            });
-          }
-        }
-        if (plan.myelin) {
-          const eventKey = `${plan.myelin.placeName.title}-${plan.myelin.placeName.address}`;
-          if (!seenEvents.has(eventKey)) {
-            seenEvents.add(eventKey);
-            console.log('Myelin Event:', {
-              title: plan.myelin.placeName.title,
-              address: plan.myelin.placeName.address,
-              description: plan.myelin.description,
-              mainTag: plan.myelin.mainTag,
-              subTags: plan.myelin.subTags
-            });
-          }
-        }
-      });
-
-      set({ plans: plansWithThumbnails, isLoading: false });
+      set({ plans: processedPlans, isLoading: false });
     } catch (error) {
       set({ error: errorHandler(error), isLoading: false });
     }
@@ -162,35 +167,14 @@ export const usePlanStore = create<PlanStore>((set) => ({
         .filter((plan: Plan) => plan.userId === usePlanStore.getState().user?.id)
         .filter((plan: Plan, index: number, self: Plan[]) =>
           index === self.findIndex((p) => (
-            p.plan === plan.plan && p.date === plan.date
+            p.plan === plan.plan && p.date === p.date
           ))
         );
 
-      const plansWithThumbnails = await Promise.all(
-        userPlans.map(async (plan: Plan) => {
-          if (plan.myelin?.file?.url) {
-            const isVideo = plan.myelin.file.url.match(/\.(mp4|mov|avi|wmv)$/i);
-            if (isVideo) {
-              const thumbnail = await generateThumbnail(plan.myelin.file.url);
-              if (thumbnail) {
-                return {
-                  ...plan,
-                  myelin: {
-                    ...plan.myelin,
-                    file: {
-                      ...plan.myelin.file,
-                      thumbnailUrl: thumbnail
-                    }
-                  }
-                };
-              }
-            }
-          }
-          return plan;
-        })
-      );
+      const processedPlans = await loadMediaInBatches(userPlans);
+      await preloadNextBatch(processedPlans);
 
-      set({ plans: plansWithThumbnails });
+      set({ plans: processedPlans });
     } catch (error) {
       set({ error: errorHandler(error) });
     }
@@ -208,6 +192,7 @@ export const usePlanStore = create<PlanStore>((set) => ({
   },
 
   logout: () => {
+    thumbnailCache.clear();
     set({
       user: null,
       plans: [],
